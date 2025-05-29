@@ -41,8 +41,15 @@ const AI_SERVICES = {
   },
   zhipu: {
     endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    model: 'glm-4-flash-250414', //glm-4v-flash glm-4-flash
+    model: 'glm-4-flash-250414', //glm-4v-flash glm-4-flash 
     prompt: `请将以下网页的主体内容部分, 转换为标准 JSON Feed 格式:
+    - 以下示例中的字段必须都包含，并且不能用示例中的默认值，必须根据实际内容进行填充。
+    - id 字段必须是一个唯一的数字标识符，你可以通过 url 字段提取出来。
+    - url 字段必须是文章的完整 URL。
+    - title 字段必须是文章的标题。
+    - image 字段必须是文章的主要图片 URL。如果没有，你可以从文章内容中提取一个图片 URL。
+    - date_published 字段必须是文章的发布日期。你可能解析到类似“2分钟前”，但需要转换为 ISO 8601 格式。
+    - tags 字段是一个字符串数组，包含文章的标签，最多5个。如果没有，你可以根据文章标题生成几个。
     输出格式示例:
     {
         "version": "https://jsonfeed.org/version/1.1",
@@ -58,7 +65,7 @@ const AI_SERVICES = {
                 "title": "This is a item title.",
                 "image": "https://example.org/item.jpg",
                 "date_published": "1991-01-01T12:00:00Z",
-                "tags": [],
+                "tags": ["tag1", "tag2"],
             }
         ]
     }`
