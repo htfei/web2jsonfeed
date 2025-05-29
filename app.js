@@ -1,12 +1,26 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const rateLimit = require('express-rate-limit');
+require('dotenv').config(); // 加载.env文件
 const app = express();
 
+// 配置速率限制：每分钟最多10次请求
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1分钟
+  max: 100, // 每个IP最多10次
+  message: '请求过于频繁，请稍后再试',
+  standardHeaders: true, // 返回RateLimit头信息
+  legacyHeaders: false // 禁用X-RateLimit头信息
+});
+
+// 应用速率限制到/api/analyze路由
+app.use('/api/analyze', limiter);
+
 // 在文件开头添加调试语句
-console.log('OPENAI_KEY:', process.env.OPENAI_API_KEY?.substring(0,6)+'...');
 ['OPENAI_API_KEY', 'CLAUDE_API_KEY','ZHIPU_API_KEY'].forEach(key => {
   if (!process.env[key]) throw new Error(`缺少环境变量: ${key}`);
+  console.log(`已加载 ${key}:`, process.env[key]?.substring(0,6)+'...');
 });
 
 // 支持的AI服务配置
@@ -37,10 +51,10 @@ const AI_SERVICES = {
             {
                 "id": "1",
                 "url": "https://example.org/item",
-                "title": "This is a item.",
+                "title": "This is a item title.",
                 "image": "https://example.org/item.jpg",
                 "date_published": "1991-01-01T12:00:00Z",
-                "tags": ["tag1", "tag2"],
+                "tags": [],
             }
         ]
     }`
