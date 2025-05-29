@@ -27,48 +27,49 @@ app.use('/api/analyze', limiter);
   console.log(`已加载 ${key}:`, process.env[key]?.substring(0,6)+'...');
 });
 
+// 全局共用提示词
+const COMMON_PROMPT = `请将以下网页的主体内容部分, 转换为标准 JSON Feed 格式:
+- 以下示例中的字段必须都包含，并且不能用示例中的默认值，必须根据实际内容进行填充。
+- id 字段必须是一个唯一的数字标识符，你可以通过 url 字段提取出来。
+- url 字段必须是文章的完整 URL。
+- title 字段必须是文章的标题。
+- image 字段必须是文章的主要图片 URL。如果没有，你可以从文章内容中提取一个图片 URL。
+- date_published 字段必须是文章的发布日期。你可能解析到类似“2分钟前”，但需要转换为 ISO 8601 格式。
+- tags 字段是一个字符串数组，包含文章的标签，最多5个。如果没有，你可以根据文章标题生成几个。
+输出格式示例:
+{
+    "version": "https://jsonfeed.org/version/1.1",
+    "title": "My Example Feed",
+    "home_page_url": "https://example.org/",
+    "feed_url": "https://example.org/feed",
+    "description": "A description of an example feed.",
+    "favicon": "https://example.org/favicon.ico",
+    "items": [
+        {
+            "id": "1",
+            "url": "https://example.org/item",
+            "title": "This is a item title.",
+            "image": "https://example.org/item.jpg",
+            "date_published": "1991-01-01T12:00:00Z",
+            "tags": ["tag1", "tag2"],
+        }
+    ]
+}
+`;
+
 // 支持的AI服务配置
 const AI_SERVICES = {
   openai: {
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    model: 'gpt-3.5-turbo-1106',
-    prompt: `请将以下网页内容转换为标准JSON Feed格式:`
+    model: 'gpt-3.5-turbo-1106'
   },
   claude: {
     endpoint: 'https://api.anthropic.com/v1/complete',
-    model: 'claude-2',
-    prompt: `Human: 请将网页内容转为JSON格式，包含标题、正文、实体和标签\n\nAssistant:`
+    model: 'claude-2'
   },
   zhipu: {
     endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    model: 'glm-4-flash-250414', //glm-4v-flash glm-4-flash 
-    prompt: `请将以下网页的主体内容部分, 转换为标准 JSON Feed 格式:
-    - 以下示例中的字段必须都包含，并且不能用示例中的默认值，必须根据实际内容进行填充。
-    - id 字段必须是一个唯一的数字标识符，你可以通过 url 字段提取出来。
-    - url 字段必须是文章的完整 URL。
-    - title 字段必须是文章的标题。
-    - image 字段必须是文章的主要图片 URL。如果没有，你可以从文章内容中提取一个图片 URL。
-    - date_published 字段必须是文章的发布日期。你可能解析到类似“2分钟前”，但需要转换为 ISO 8601 格式。
-    - tags 字段是一个字符串数组，包含文章的标签，最多5个。如果没有，你可以根据文章标题生成几个。
-    输出格式示例:
-    {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "My Example Feed",
-        "home_page_url": "https://example.org/",
-        "feed_url": "https://example.org/feed",
-        "description": "A description of an example feed.",
-        "favicon": "https://example.org/favicon.ico",
-        "items": [
-            {
-                "id": "1",
-                "url": "https://example.org/item",
-                "title": "This is a item title.",
-                "image": "https://example.org/item.jpg",
-                "date_published": "1991-01-01T12:00:00Z",
-                "tags": ["tag1", "tag2"],
-            }
-        ]
-    }`
+    model: 'glm-4-flash-250414' //glm-4v-flash glm-4-flash 
   }
 };
 
@@ -180,7 +181,7 @@ async function processWithAI(serviceName, content) {
   const payload = {
     model: service.model,
     messages: [
-      {role: "system", content: service.prompt},
+      {role: "system", content: COMMON_PROMPT},
       {role: "user", content: JSON.stringify(content)}
     ],
     response_format: { type: "json_object" }
