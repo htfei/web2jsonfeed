@@ -2,7 +2,11 @@ const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const rateLimit = require('express-rate-limit');
+const NodeCache = require('node-cache');
 require('dotenv').config(); // 加载.env文件
+
+// 创建缓存实例，设置默认过期时间为5分钟（300秒）
+const myCache = new NodeCache({ stdTTL: 300 });
 const app = express();
 
 // 配置速率限制：每分钟最多10次请求
@@ -86,6 +90,22 @@ function validateParams(req, res, next) {
 app.get('/api/analyze', validateParams, async (req, res) => {
   try {
     const { ai, url } = req.query;
+    console.log(`处理请求: ${ai} ${url}`);
+    
+    // 生成缓存键（基于ai和url）
+    const cacheKey = `analyze:${ai}:${url}`;
+    // 检查缓存是否存在
+    const cachedResult = myCache.get(cacheKey);
+    if (cachedResult) {
+      console.log('使用缓存结果');
+      return res.json({
+        status: "success",
+        data: {
+          ...cachedResult,
+          generated_at: new Date().toISOString()
+        }
+      });
+    }
     
     // 1. 获取网页内容
     const html = await fetchWebContent(url);
@@ -96,7 +116,9 @@ app.get('/api/analyze', validateParams, async (req, res) => {
     // 3. 调用AI处理
     const result = await processWithAI(ai, content);
     
-    // 4. 返回格式化结果
+    // 4. 存储结果到缓存
+    myCache.set(cacheKey, result);
+    // 返回格式化结果
     res.json({
       status: "success",
       data: {
