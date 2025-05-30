@@ -25,9 +25,4 @@ cp .env.example .env
 ```bash
  deno task start
 ```
-服务启动后，访问`http://localhost:3000`查看接口文档。
-
-## API文档
-```http
-GET /api/analyze?ai=openai&url=https://example.com
-```
+服务启动后，访问`http://localhost:8000?ai=openai&url=https://example.com` 即可获取转换后的JSON订阅源。

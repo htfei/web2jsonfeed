@@ -85,9 +85,6 @@ const limiter = createRateLimiter();
 
 // 主处理函数（与app.js路由逻辑一致）
 const handler = async (req: Request): Promise<Response> => {
-  if (new URL(req.url).pathname !== '/api/analyze') {
-    return new Response('Not Found', { status: 404 });
-  }
 
   if (!limiter(req)) {
     return new Response(JSON.stringify({ status: "error", message: "请求过于频繁，请稍后再试" }), {
