@@ -4,9 +4,7 @@
 
 // 导入Deno兼容库
 import 'npm:dotenv@16.5.0/config.js'; // 自动加载.env文件到Deno.env
-import { serve } from "https://deno.land/std@0.210.0/http/server.ts";
 import * as cheerio from "npm:cheerio@1.0.0";
-import type { Request } from "https://deno.land/std@0.210.0/http/server.ts";
 
 // 必需的环境变量列表（与app.js完全一致）
 const requiredKeys = ['OPENAI_API_KEY', 'CLAUDE_API_KEY', 'ZHIPU_API_KEY', 'XUNFEI_API_KEY'];
@@ -215,4 +213,4 @@ async function processWithAI(serviceName: string, content: { $: cheerio.Root; ti
 }
 
 // 启动服务（Deno标准HTTP服务）
-serve(handler, { port: 3000 });
+Deno.serve(handler, { port: 8000 });
