@@ -40,7 +40,7 @@ const COMMON_PROMPT =
   - title 字段必须是文章的标题。
   - image 字段必须是文章的主要图片 URL。如果没有，你可以从文章内容中提取一个图片 URL。
   - date_published 字段必须是文章的发布日期。你可能解析到类似“2分钟前”，但需要转换为 ISO 8601 格式。
-  - tags 字段是一个字符串数组，包含文章的标签，最多5个。如果没有，你可以根据文章标题生成几个。
+  - tags 字段是一个字符串数组，包含文章的标签，建议2~3个，最多5个。如果没有，你可以根据文章标题生成几个。
   输出格式示例:
   {
       "version": "https://jsonfeed.org/version/1.1",
@@ -89,7 +89,8 @@ const AI_SERVICES = {
 function validateParams(req, res, next) {
   const { ai, url } = req.query;
   
-  if (!ai || !AI_SERVICES[ai]) {
+  // 允许ai为空或'rebot'时使用自动提取
+  if (ai && ai !== 'rebot' && !AI_SERVICES[ai]) {
     return res.status(400).json({
       status: "error",
       message: "无效的AI服务参数，支持: " + Object.keys(AI_SERVICES).join(',')
@@ -130,11 +131,14 @@ app.get('/api/analyze', validateParams, async (req, res) => {
     // 1. 获取网页内容
     const html = await fetchWebContent(url);
     
-    // 2. 提取主要内容
+    // 2. 提取主要内容（包含cheerio实例）
     const content = extractMainContent(html, url);
+    content.html = html; // 保留原始HTML供可能的后续使用
     
-    // 3. 调用AI处理
-    const result = await processWithAI(ai, content);
+    // 3. 选择处理方式（自动提取或AI处理）
+    const result = (ai === 'rebot' || !ai)
+      ? await autoExtractContent(content)
+      : await processWithAI(ai, content);
     
     // 4. 存储结果到缓存
     myCache.set(cacheKey, result);
@@ -167,6 +171,53 @@ async function fetchWebContent(url) {
   return response.data;
 }
 
+// 自动提取内容生成JSON Feed的函数
+async function autoExtractContent(content) {
+  const $ = content.$; // 使用extractMainContent返回的cheerio实例
+  
+  // 提取文章列表（扩展常见列表选择器，覆盖更多网页结构）
+  const articleItems = $('main article, .article-list .item, .post-list .post, .entry-list .entry, .posts .post, div[class*="article"], div[class*="post"], .topic-item').toArray();
+  const items = articleItems.map((item, index) => {
+    const $item = $(item);
+    const itemTitle = $item.find('h2, h3').text().trim() || '未识别条目标题';
+    // 优先获取a标签href，处理相对路径
+    const rawUrl = $item.find('a').attr('href') || $('link[rel="canonical"]').attr('href') || content.url;
+    const itemUrl = new URL(rawUrl, content.url).href; // 转换为绝对路径
+    const itemImage = $item.find('img').attr('src') || $('meta[property="og:image"]').attr('content') || '';
+    // 优先从meta标签获取发布时间（支持og:published_time和twitter:date）
+    const metaDate = $('meta[property="og:published_time"], meta[name="twitter:date"]').attr('content') || new Date().toISOString();
+    const itemDate = $item.find('.date, .post-time').text() || metaDate;
+    // 扩展标签提取源（支持tags、categories、keywords）
+    const itemTags = $item.find('.tags a, .categories a, .keyword a').map((i, el) => $(el).text()).get().slice(0,5) || ['默认标签'];
+
+    return {
+      id: `${index}`,
+      url: new URL(itemUrl, content.url).href,
+      title: itemTitle,
+      image: new URL(itemImage, content.url).href,
+      date_published: new Date(itemDate).toISOString(),
+      tags: itemTags
+    };
+  });
+  
+  return {
+    version: "https://jsonfeed.org/version/1.1",
+    title: content.title || '未识别标题',
+    home_page_url: content.url,
+    feed_url: `${content.url}/feed`,
+    description: $('meta[name="description"]').attr('content') || '自动解析的网页内容',
+    favicon: $('link[rel="icon"]').attr('href') || '',
+    items: items.length > 0 ? items : [{
+      id: 1,
+      url: content.url,
+      title: content.title || '未识别标题',
+      image: $('meta[property="og:image"]').attr('content') || $('img').first().attr('src') || '',
+      date_published: new Date().toISOString(),
+      tags: $('meta[name="keywords"]').attr('content')?.split(',').slice(0,5) || ['默认标签']
+    }]
+  };
+}
+
 // 内容提取核心逻辑
 function extractMainContent(html, url) {
   const $ = cheerio.load(html);
@@ -175,6 +226,7 @@ function extractMainContent(html, url) {
   const mainContent = $('#article-body, .article-list, .post-content, .entry-list, main').html() || $('body').html();
   
   return {
+    $: $, // 返回cheerio实例避免重复加载
     title: $('title').text(),
     content: mainContent || '内容解析失败',
     url: url
